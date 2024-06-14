@@ -1,3 +1,4 @@
+# BEGIN GITHUB'S GO DEFAULTS
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
@@ -20,3 +21,8 @@
 # Go workspace file
 go.work
 go.work.sum
+
+# END GITHUB'S GO DEFAULTS
+
+# Let's keep big files like WAVs from being uploaded
+*.wav
