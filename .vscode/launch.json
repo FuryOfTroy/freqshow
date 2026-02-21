@@ -10,7 +10,14 @@
             "request": "launch",
             "mode": "debug",
             "program": "main.go",
-            "args": ["modify", "example_short.wav"]
+            "args": [
+                "eq",
+                "--input-file", "example_short.wav",
+                "--output-file", "result.wav",
+                "--freq-start", "2000",
+                "--freq-end", "20000",
+                "--gain", "-30"
+            ]
         }
     ]
 }

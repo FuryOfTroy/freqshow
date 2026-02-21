@@ -18,17 +18,20 @@ The project is structured as a CLI tool using the `cobra` library. The main logi
 - Project dependencies are managed with Go Modules.
 
 ### Running the application
-To run the application, use `go run`. The primary command is `modify`, which processes a WAV file.
+To run the application, use `go run`. The primary command is `eq`, which applies equalization to a WAV file.
 
 ```sh
 # Download dependencies
 go mod tidy
 
-# Run the modify command
-go run main.go modify <input.wav> [output.wav]
+# Run the eq command
+go run main.go eq --input-file <input.wav> --output-file [output.wav] --freq-start <start_freq> --freq-end <end_freq> --gain <gain_db>
 ```
-- `<input.wav>`: The path to the source WAV file.
-- `[output.wav]`: (Optional) The path for the modified output file. Defaults to `result.wav`.
+- `--input-file <input.wav>`: The path to the source WAV file (required).
+- `--output-file [output.wav]`: (Optional) The path for the modified output file. Defaults to `result.wav`.
+- `--freq-start <start_freq>`: Starting frequency for the EQ band (Hz). Defaults to 20.0 Hz.
+- `--freq-end <end_freq>`: Ending frequency for the EQ band (Hz). Defaults to 20000.0 Hz.
+- `--gain <gain_db>`: Gain to apply to the frequency band (in dB). Defaults to 0.0 dB.
 
 ### Building the application
 To build a binary executable:
@@ -38,11 +41,11 @@ go build .
 This will create a `freqshow` (or `freqshow.exe`) executable in the project root.
 
 ```sh
-./freqshow modify <input.wav> [output.wav]
+./freqshow eq --input-file <input.wav> --output-file [output.wav] --freq-start <start_freq> --freq-end <end_freq> --gain <gain_db>
 ```
 
 ### Testing
-There are no test files in the project.
+There are no test files in the project. This has proven challenging during development, highlighting the critical need for a robust test suite to verify the FFT and audio processing logic, especially given the subtle interactions between different components.
 TODO: Add a test suite to verify the FFT and audio processing logic.
 
 ## Development Conventions

@@ -42,11 +42,17 @@ func performIFFT(fftData []complex128) []float64 {
 	return pcmData
 }
 
-func modifyFFT(fftData []complex128, sampleRate int, cutoffFrequency float64) {
+func applyEQ(fftData []complex128, sampleRate, numSamples int, freqStart, freqEnd, gain float64) {
+	// Convert gain from dB to a linear amplitude multiplier
+	gainLinear := math.Pow(10, gain/20.0)
+
 	for i := range fftData {
-		freq := float64(i) * float64(sampleRate) / float64(len(fftData))
-		if freq > cutoffFrequency {
-			fftData[i] = 0
+		// Calculate the frequency for the current FFT bin
+		freq := float64(i) * float64(sampleRate) / float64(numSamples)
+
+		// Apply gain if the frequency is within the specified range
+		if freq >= freqStart && freq <= freqEnd {
+			fftData[i] *= complex(gainLinear, 0)
 		}
 	}
 }
@@ -70,16 +76,31 @@ func main() {
 This tool hasn't been tested in a professional or academic setting, so it likely has bugs. Please test your results against industry-trusted, battle-tested alternatives`,
 	}
 
-	var modifyCmd = &cobra.Command{
-		Use:   "modify",
-		Short: "Modify the provided WAV file",
-		Args:  cobra.RangeArgs(1, 2),
+	var (
+		freqStart      float64
+		freqEnd        float64
+		gain           float64
+		inputFilePath  string
+		outputFilePath string
+	)
+
+	var eqCmd = &cobra.Command{
+		Use:   "eq",
+		Short: "Apply equalization (gain) to a specified frequency range in the WAV file",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdModify(args)
+			cmdEq(inputFilePath, outputFilePath, freqStart, freqEnd, gain)
 		},
 	}
 
-	rootCmd.AddCommand(modifyCmd)
+	eqCmd.Flags().StringVarP(&inputFilePath, "input-file", "i", "", "Path to the source WAV file (required)")
+	eqCmd.Flags().StringVarP(&outputFilePath, "output-file", "o", "result.wav", "Path for the modified output WAV file")
+	eqCmd.Flags().Float64Var(&freqStart, "freq-start", 20.0, "Starting frequency for the EQ band (Hz)")
+	eqCmd.Flags().Float64Var(&freqEnd, "freq-end", 20000.0, "Ending frequency for the EQ band (Hz)")
+	eqCmd.Flags().Float64Var(&gain, "gain", 0.0, "Gain to apply to the frequency band (in dB)")
+
+	eqCmd.MarkFlagRequired("input-file")
+
+	rootCmd.AddCommand(eqCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Printf("Whoops. There was an error while executing your CLI '%s'\n", err)
@@ -87,12 +108,7 @@ This tool hasn't been tested in a professional or academic setting, so it likely
 	}
 }
 
-func cmdModify(args []string) {
-	inputFilePath := args[0]
-	outputFilePath := "result.wav"
-	if len(args) == 2 {
-		outputFilePath = args[1]
-	}
+func cmdEq(inputFilePath, outputFilePath string, freqStart, freqEnd, gain float64) {
 
 	log.Printf(`
 {
@@ -145,22 +161,28 @@ func cmdModify(args []string) {
 		}
 	}
 
-	processedChannelsData := make([][]float64, decoder.NumChans)
+	outputBuffer := make([][]float64, decoder.NumChans)
+
+	stepSize := chunkSize - overlap
+
 	for ch := 0; ch < int(decoder.NumChans); ch++ {
 		log.Printf("Processing channel %d of %d\n", ch+1, decoder.NumChans)
-		processedChannelsData[ch] = make([]float64, 0, numSamples)
+		outputBuffer[ch] = make([]float64, numSamples+chunkSize) // Initialize per-channel output buffer with enough space
 
-		for i := 0; i < numSamples; i += chunkSize {
+		// This loop processes the input 'channelsData' in chunks
+		for i := 0; i < numSamples; i += stepSize {
 			if i > 0 && i%(numSamples/10) == 0 {
 				log.Printf("  ...channel %d progress: %d%%", ch+1, int(float64(i)/float64(numSamples)*100))
 			}
 
+			// Ensure chunk does not go out of bounds of channelsData
 			end := i + chunkSize
-			if end > numSamples {
-				end = numSamples
+			if end > len(channelsData[ch]) {
+				end = len(channelsData[ch])
 			}
 			chunk := channelsData[ch][i:end]
 
+			// Pad chunk if smaller than chunkSize for FFT
 			if len(chunk) < chunkSize {
 				paddedChunk := make([]float64, chunkSize)
 				copy(paddedChunk, chunk)
@@ -169,17 +191,25 @@ func cmdModify(args []string) {
 
 			windowedChunk := applyHannWindow(chunk)
 			fftData := performFFT(windowedChunk)
-			modifyFFT(fftData, int(decoder.SampleRate), cutoffFrequency)
+			applyEQ(fftData, int(decoder.SampleRate), chunkSize, freqStart, freqEnd, gain)
 			ifftResult := performIFFT(fftData)
 
-			processedChannelsData[ch] = append(processedChannelsData[ch], ifftResult[:len(chunk)]...)
+			// Overlap-add implementation:
+			// Add the IFFT result to the output buffer, summing in overlapping regions
+			writePos := i
+			for j := 0; j < len(ifftResult); j++ {
+				if writePos+j < len(outputBuffer[ch]) {
+					outputBuffer[ch][writePos+j] += ifftResult[j]
+				}
+			}
 		}
 	}
 
 	outputIntBufferData := make([]int, numSamples*int(decoder.NumChans))
 	for i := 0; i < numSamples; i++ {
 		for ch := 0; ch < int(decoder.NumChans); ch++ {
-			sample := processedChannelsData[ch][i] * math.MaxInt16
+			// Read from outputBuffer[ch] instead of processedChannelsData[ch]
+			sample := outputBuffer[ch][i] * math.MaxInt16
 			if sample > math.MaxInt16 {
 				sample = math.MaxInt16
 			} else if sample < math.MinInt16 {
