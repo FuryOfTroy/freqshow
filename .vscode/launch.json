@@ -18,6 +18,15 @@
                 "--freq-end", "20000",
                 "--gain", "-30"
             ]
+        },
+        {
+            "name": "Launch GUI",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": ".",
+            "args": ["gui"],
+            "buildFlags": ["-tags", "gui"]
         }
     ]
 }

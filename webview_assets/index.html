@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freqshow EQ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Freqshow EQ</h1>
+        <div class="form-group">
+            <label for="inputFile">Input WAV File:</label>
+            <input type="text" id="inputFile" value="example_short.wav">
+        </div>
+        <div class="form-group">
+            <label for="outputFile">Output WAV File:</label>
+            <input type="text" id="outputFile" value="output.wav">
+        </div>
+        <div class="form-group">
+            <label for="freqStart">Frequency Start (Hz):</label>
+            <input type="number" id="freqStart" value="100.0" step="any">
+        </div>
+        <div class="form-group">
+            <label for="freqEnd">Frequency End (Hz):</label>
+            <input type="number" id="freqEnd" value="1000.0" step="any">
+        </div>
+        <div class="form-group">
+            <label for="gain">Gain (dB):</label>
+            <input type="number" id="gain" value="6.0" step="any">
+        </div>
+        <button id="runEqButton">Run EQ Command</button>
+        <pre id="outputLog"></pre>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -16,4 +16,5 @@ require (
 require (
 	github.com/go-audio/wav v1.1.0
 	github.com/spf13/cobra v1.8.1
+	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
 )
