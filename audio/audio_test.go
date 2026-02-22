@@ -1,4 +1,4 @@
-package main
+package audio
 
 import (
 	"math"
@@ -127,7 +127,7 @@ func TestPerformIFFT(t *testing.T) {
 	compareFloat64Slices(t, got4, expected4, 1e-9, "IFFT Sine wave test")
 }
 
-func TestApplyEQ(t *testing.T) {
+func TestApplyEQToFFT(t *testing.T) {
 	sampleRate := 44100
 	numSamples := 1024 // Corresponds to the FFT size
 
@@ -139,8 +139,8 @@ func TestApplyEQ(t *testing.T) {
 	originalFFTData1 := make([]complex128, numSamples)
 	copy(originalFFTData1, fftData1)
 
-	ApplyEQ(fftData1, sampleRate, numSamples, 0.0, float64(sampleRate/2), 0.0) // 0dB gain
-	compareComplex128Slices(t, fftData1, originalFFTData1, 1e-9, "ApplyEQ No gain test")
+	ApplyEQToFFT(fftData1, sampleRate, numSamples, 0.0, float64(sampleRate/2), 0.0) // 0dB gain
+	compareComplex128Slices(t, fftData1, originalFFTData1, 1e-9, "ApplyEQToFFT No gain test")
 
 	// Test case 2: Positive gain in a specific frequency range
 	fftData2 := make([]complex128, numSamples)
@@ -159,13 +159,13 @@ func TestApplyEQ(t *testing.T) {
 	gainDB := 6.0 // 6dB gain means amplitude doubles (2x)
 	gainLinear := math.Pow(10, gainDB/20)
 
-	ApplyEQ(fftData2, sampleRate, numSamples, freqStart, freqEnd, gainDB)
+	ApplyEQToFFT(fftData2, sampleRate, numSamples, freqStart, freqEnd, gainDB)
 
 	// Check target bin
 	expectedTargetBin := originalFFTData2[targetBin] * complex(gainLinear, 0.0)
 	if math.Abs(real(fftData2[targetBin])-real(expectedTargetBin)) > 1e-9 ||
 		math.Abs(imag(fftData2[targetBin])-imag(expectedTargetBin)) > 1e-9 {
-		t.Errorf("ApplyEQ Positive gain: Mismatched target bin. Got %v, want %v", fftData2[targetBin], expectedTargetBin)
+		t.Errorf("ApplyEQToFFT Positive gain: Mismatched target bin. Got %v, want %v", fftData2[targetBin], expectedTargetBin)
 	}
 
 	// Check non-target bin (should be unchanged)
@@ -173,7 +173,7 @@ func TestApplyEQ(t *testing.T) {
 	if nonTargetBin >= numSamples {
 		nonTargetBin = targetBin - 1
 	}
-	compareComplex128Slices(t, []complex128{fftData2[nonTargetBin]}, []complex128{originalFFTData2[nonTargetBin]}, 1e-9, "ApplyEQ non-target bin should be unchanged")
+	compareComplex128Slices(t, []complex128{fftData2[nonTargetBin]}, []complex128{originalFFTData2[nonTargetBin]}, 1e-9, "ApplyEQToFFT non-target bin should be unchanged")
 
 	// Test case 3: Negative gain in a specific frequency range
 	fftData3 := make([]complex128, numSamples)
@@ -186,13 +186,13 @@ func TestApplyEQ(t *testing.T) {
 	gainDB_neg := -6.0 // -6dB gain means amplitude halves (0.5x)
 	gainLinear_neg := math.Pow(10, gainDB_neg/20)
 
-	ApplyEQ(fftData3, sampleRate, numSamples, freqStart, freqEnd, gainDB_neg)
+	ApplyEQToFFT(fftData3, sampleRate, numSamples, freqStart, freqEnd, gainDB_neg)
 
 	// Check target bin
 	expectedTargetBin_neg := originalFFTData3[targetBin] * complex(gainLinear_neg, 0.0)
 	if math.Abs(real(fftData3[targetBin])-real(expectedTargetBin_neg)) > 1e-9 ||
 		math.Abs(imag(fftData3[targetBin])-imag(expectedTargetBin_neg)) > 1e-9 {
-		t.Errorf("ApplyEQ Negative gain: Mismatched target bin. Got %v, want %v", fftData3[targetBin], expectedTargetBin_neg)
+		t.Errorf("ApplyEQToFFT Negative gain: Mismatched target bin. Got %v, want %v", fftData3[targetBin], expectedTargetBin_neg)
 	}
 
 	// Test case 4: Edge case - freqStart > freqEnd
@@ -201,6 +201,6 @@ func TestApplyEQ(t *testing.T) {
 	originalFFTData4 := make([]complex128, numSamples)
 	copy(originalFFTData4, fftData4)
 
-	ApplyEQ(fftData4, sampleRate, numSamples, 2000.0, 1000.0, 6.0) // Invalid range
-	compareComplex128Slices(t, fftData4, originalFFTData4, 1e-9, "ApplyEQ Invalid frequency range test")
+	ApplyEQToFFT(fftData4, sampleRate, numSamples, 2000.0, 1000.0, 6.0) // Invalid range
+	compareComplex128Slices(t, fftData4, originalFFTData4, 1e-9, "ApplyEQToFFT Invalid frequency range test")
 }
