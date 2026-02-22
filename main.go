@@ -13,6 +13,7 @@ import (
 
 
 
+
 var rootCmd = &cobra.Command{
 	Use:   "freqshow",
 	Short: "freqshow - a CLI that SHOWs FREQuencies ",
@@ -110,11 +111,11 @@ func cmdEq(inputFilePath, outputFilePath string, freqStart, freqEnd, gain float6
 
 	outputBuffer := make([][]float64, decoder.NumChans)
 
-	stepSize := chunkSize - overlap
+	stepSize := ChunkSize - Overlap
 
 	for ch := 0; ch < int(decoder.NumChans); ch++ {
 		log.Printf("Processing channel %d of %d\n", ch+1, decoder.NumChans)
-		outputBuffer[ch] = make([]float64, numSamples+chunkSize) // Initialize per-channel output buffer with enough space
+		outputBuffer[ch] = make([]float64, numSamples+ChunkSize) // Initialize per-channel output buffer with enough space
 
 		// This loop processes the input 'channelsData' in chunks
 		for i := 0; i < numSamples; i += stepSize {
@@ -123,23 +124,23 @@ func cmdEq(inputFilePath, outputFilePath string, freqStart, freqEnd, gain float6
 			}
 
 			// Ensure chunk does not go out of bounds of channelsData
-			end := i + chunkSize
+			end := i + ChunkSize
 			if end > len(channelsData[ch]) {
 				end = len(channelsData[ch])
 			}
 			chunk := channelsData[ch][i:end]
 
 			// Pad chunk if smaller than chunkSize for FFT
-			if len(chunk) < chunkSize {
-				paddedChunk := make([]float64, chunkSize)
+			if len(chunk) < ChunkSize {
+				paddedChunk := make([]float64, ChunkSize)
 				copy(paddedChunk, chunk)
 				chunk = paddedChunk
 			}
 
-			windowedChunk := applyHannWindow(chunk)
-			fftData := performFFT(windowedChunk)
-			applyEQ(fftData, int(decoder.SampleRate), chunkSize, freqStart, freqEnd, gain)
-			ifftResult := performIFFT(fftData)
+			windowedChunk := ApplyHannWindow(chunk)
+			fftData := PerformFFT(windowedChunk)
+			ApplyEQ(fftData, int(decoder.SampleRate), ChunkSize, freqStart, freqEnd, gain)
+			ifftResult := PerformIFFT(fftData)
 
 			// Overlap-add implementation:
 			// Add the IFFT result to the output buffer, summing in overlapping regions

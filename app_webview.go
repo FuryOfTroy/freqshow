@@ -1,5 +1,3 @@
-//go:build gui
-
 package main
 
 import (
@@ -14,8 +12,8 @@ import (
 )
 
 const (
-	chunkSize       = 1024
-	overlap         = 512
+	ChunkSize       = 1024
+	Overlap         = 512
 	sampleRate      = 44100
 	numChannels     = 2
 	cutoffFrequency = 1000.0
@@ -70,33 +68,33 @@ func (a *App) RunEQCommand(inputFilePath, outputFilePath string, freqStart, freq
 
 	outputBuffer := make([][]float64, decoder.NumChans)
 
-	stepSize := chunkSize - overlap
+	stepSize := ChunkSize - Overlap
 
 	for ch := 0; ch < int(decoder.NumChans); ch++ {
 		log.Printf("Processing channel %d of %d\n", ch+1, decoder.NumChans)
-		outputBuffer[ch] = make([]float64, numSamples+chunkSize) // Initialize per-channel output buffer with enough space
+		outputBuffer[ch] = make([]float64, numSamples+ChunkSize) // Initialize per-channel output buffer with enough space
 
 		for i := 0; i < numSamples; i += stepSize {
 			if i > 0 && i%(numSamples/10) == 0 {
 				log.Printf("  ...channel %d progress: %d%%", ch+1, int(float64(i)/float64(numSamples)*100))
 			}
 
-			end := i + chunkSize
+			end := i + ChunkSize
 			if end > len(channelsData[ch]) {
 				end = len(channelsData[ch])
 			}
 			chunk := channelsData[ch][i:end]
 
-			if len(chunk) < chunkSize {
-				paddedChunk := make([]float64, chunkSize)
+			if len(chunk) < ChunkSize {
+				paddedChunk := make([]float64, ChunkSize)
 				copy(paddedChunk, chunk)
 				chunk = paddedChunk
 			}
 
-			windowedChunk := applyHannWindow(chunk)
-			fftData := performFFT(windowedChunk)
-			applyEQ(fftData, int(decoder.SampleRate), chunkSize, freqStart, freqEnd, gain)
-			ifftResult := performIFFT(fftData)
+			windowedChunk := ApplyHannWindow(chunk)
+			fftData := PerformFFT(windowedChunk)
+			ApplyEQ(fftData, int(decoder.SampleRate), ChunkSize, freqStart, freqEnd, gain)
+			ifftResult := PerformIFFT(fftData)
 
 			writePos := i
 			for j := 0; j < len(ifftResult); j++ {
@@ -149,7 +147,7 @@ func (a *App) saveWav(filePath string, pcmData []int, decoder *wav.Decoder) erro
 }
 
 // applyHannWindow applies a Hann window to the given data.
-func applyHannWindow(data []float64) []float64 {
+func ApplyHannWindow(data []float64) []float64 {
 	N := len(data)
 	windowedData := make([]float64, N)
 	for n := 0; n < N; n++ {
@@ -159,12 +157,15 @@ func applyHannWindow(data []float64) []float64 {
 }
 
 // performFFT performs a Fast Fourier Transform on the PCM data.
-func performFFT(pcmData []float64) []complex128 {
+func PerformFFT(pcmData []float64) []complex128 {
 	return fft.FFTReal(pcmData)
 }
 
 // performIFFT performs an Inverse Fast Fourier Transform on the FFT data.
-func performIFFT(fftData []complex128) []float64 {
+func PerformIFFT(fftData []complex128) []float64 {
+	if len(fftData) == 0 {
+		return []float64{}
+	}
 	ifftResult := fft.IFFT(fftData)
 	pcmData := make([]float64, len(ifftResult))
 	for i, value := range ifftResult {
@@ -174,7 +175,7 @@ func performIFFT(fftData []complex128) []float64 {
 }
 
 // applyEQ applies equalization (gain) to the frequency data.
-func applyEQ(fftData []complex128, sampleRate, numSamples int, freqStart, freqEnd, gain float64) {
+func ApplyEQ(fftData []complex128, sampleRate, numSamples int, freqStart, freqEnd, gain float64) {
 	// Convert gain from dB to a linear amplitude multiplier
 	gainLinear := math.Pow(10, gain/20.0)
 
@@ -190,11 +191,11 @@ func applyEQ(fftData []complex128, sampleRate, numSamples int, freqStart, freqEn
 }
 
 // chunkData splits the data into overlapping chunks.
-func chunkData(data []float64, chunkSize, overlap int) [][]float64 {
+func chunkData(data []float64, ChunkSize, Overlap int) [][]float64 {
 	var chunks [][]float64
-	stepSize := chunkSize - overlap
-	for start := 0; start < len(data)-chunkSize; start += stepSize {
-		chunk := data[start : start+chunkSize]
+	stepSize := ChunkSize - Overlap
+	for start := 0; start < len(data)-ChunkSize; start += stepSize {
+		chunk := data[start : start+ChunkSize]
 		chunks = append(chunks, chunk)
 	}
 	return chunks
