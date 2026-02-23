@@ -129,10 +129,10 @@ func (s *EQStream) Read(p []byte) (n int, err error) {
 				newOverlap := make([]float64, ChunkSize);
 				if len(s.overlapBuf[ch]) > stepSize { copy(newOverlap, s.overlapBuf[ch][stepSize:]) };
 				s.overlapBuf[ch] = newOverlap;
-				// Remove processed samples from channelsData - always remove ChunkSize if processed a full chunk,
+				// Remove processed samples from channelsData - always remove stepSize if processed a full chunk,
 				// otherwise remove whatever was available if it was a partial/padded chunk at EOF.
-				if len(s.channelsData[ch]) >= ChunkSize {
-					s.channelsData[ch] = s.channelsData[ch][ChunkSize:]
+				if len(s.channelsData[ch]) >= stepSize {
+					s.channelsData[ch] = s.channelsData[ch][stepSize:]
 				} else { // It was a partial chunk, now consumed
 					s.channelsData[ch] = []float64{}
 				}

@@ -87,6 +87,10 @@ func (a *App) runPlay(inputFilePath string, freqStart, freqEnd, gain float64) {
 		ChannelCount: int(decoder.NumChans()),
 		Format:       oto.FormatSignedInt16LE,
 	}
+	log.Printf("DEBUG: WAV file attributes - SampleRate: %d, NumChans: %d", decoder.SampleRate(), decoder.NumChans())
+	log.Printf("DEBUG: oto.NewContextOptions - SampleRate: %d, ChannelCount: %d, Format: %v", newOpts.SampleRate, newOpts.ChannelCount, newOpts.Format)
+
+
 	if a.otoCtx == nil || !reflect.DeepEqual(a.otoCtxOpts, newOpts) {
 		ctx, ready, err := oto.NewContext(&newOpts)
 		if err != nil {
