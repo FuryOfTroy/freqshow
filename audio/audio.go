@@ -16,6 +16,40 @@ const (
 	Overlap   = 512
 )
 
+// PcmDecoder defines the interface that EQStream needs from a WAV decoder.
+type PcmDecoder interface {
+	PCMBuffer(buf *audio.IntBuffer) (n int, err error)
+	SampleRate() uint32
+	NumChans() uint16
+	BitDepth() uint16
+}
+
+// WavDecoderWrapper wraps *wav.Decoder to implement PcmDecoder interface.
+type WavDecoderWrapper struct {
+	*wav.Decoder
+}
+
+// PCMBuffer implements PcmDecoder.PCMBuffer
+func (w *WavDecoderWrapper) PCMBuffer(buf *audio.IntBuffer) (n int, err error) {
+	return w.Decoder.PCMBuffer(buf)
+}
+
+// SampleRate implements PcmDecoder.SampleRate
+func (w *WavDecoderWrapper) SampleRate() uint32 {
+	return w.Decoder.SampleRate
+}
+
+// NumChans implements PcmDecoder.NumChans
+func (w *WavDecoderWrapper) NumChans() uint16 {
+	return w.Decoder.NumChans
+}
+
+// BitDepth implements PcmDecoder.BitDepth
+func (w *WavDecoderWrapper) BitDepth() uint16 {
+	return w.Decoder.BitDepth
+}
+
+
 // ApplyEqualization processes a WAV file and applies equalization to the specified frequency range.
 func ApplyEqualization(inputFilePath, outputFilePath string, freqStart, freqEnd, gain float64) error {
 	log.Printf(`Processing EQ:
@@ -32,43 +66,46 @@ func ApplyEqualization(inputFilePath, outputFilePath string, freqStart, freqEnd,
 	}
 	defer inputFile.Close()
 
-	decoder := wav.NewDecoder(inputFile)
-	if !decoder.IsValidFile() {
+	originalDecoder := wav.NewDecoder(inputFile)
+	if !originalDecoder.IsValidFile() {
 		return fmt.Errorf("invalid WAV file")
 	}
 
-	decoder.ReadMetadata()
-	decoder.Rewind()
-	log.Printf("PCM size: %d, Sample rate: %d, Bit depth: %d, Channels: %d\n",
-		decoder.PCMSize, decoder.SampleRate, decoder.BitDepth, decoder.NumChans)
+	decoder := &WavDecoderWrapper{originalDecoder}
 
-	buf, err := decoder.FullPCMBuffer()
+
+	originalDecoder.ReadMetadata() // ReadMetadata and Rewind are on the original *wav.Decoder
+	originalDecoder.Rewind()
+	log.Printf("PCM size: %d, Sample rate: %d, Bit depth: %d, Channels: %d\n",
+		originalDecoder.PCMSize, decoder.SampleRate(), decoder.BitDepth(), decoder.NumChans())
+
+	buf, err := originalDecoder.FullPCMBuffer() // FullPCMBuffer is also on the original
 	if err != nil {
 		return fmt.Errorf("failed to read PCM data: %w", err)
 	}
 	allPCMData := buf.Data
 
-	if int(decoder.NumChans) == 0 {
+	if int(decoder.NumChans()) == 0 {
 		return fmt.Errorf("number of channels cannot be zero")
 	}
-	numSamples := len(allPCMData) / int(decoder.NumChans)
+	numSamples := len(allPCMData) / int(decoder.NumChans())
 
-	channelsData := make([][]float64, decoder.NumChans)
+	channelsData := make([][]float64, decoder.NumChans())
 	for ch := range channelsData {
 		channelsData[ch] = make([]float64, numSamples)
 	}
 
 	for i := 0; i < numSamples; i++ {
-		for ch := 0; ch < int(decoder.NumChans); ch++ {
-			channelsData[ch][i] = float64(allPCMData[i*int(decoder.NumChans)+ch]) / math.MaxInt16
+		for ch := 0; ch < int(decoder.NumChans()); ch++ {
+			channelsData[ch][i] = float64(allPCMData[i*int(decoder.NumChans())+ch]) / math.MaxInt16
 		}
 	}
 
-	outputBuffer := make([][]float64, decoder.NumChans)
+	outputBuffer := make([][]float64, decoder.NumChans())
 	stepSize := ChunkSize - Overlap
 
-	for ch := 0; ch < int(decoder.NumChans); ch++ {
-		log.Printf("Processing channel %d of %d\n", ch+1, decoder.NumChans)
+	for ch := 0; ch < int(decoder.NumChans()); ch++ {
+		log.Printf("Processing channel %d of %d\n", ch+1, decoder.NumChans())
 		outputBuffer[ch] = make([]float64, numSamples+ChunkSize)
 
 		for i := 0; i < numSamples; i += stepSize {
@@ -90,7 +127,7 @@ func ApplyEqualization(inputFilePath, outputFilePath string, freqStart, freqEnd,
 
 			windowedChunk := ApplyHannWindow(chunk)
 			fftData := PerformFFT(windowedChunk)
-			ApplyEQToFFT(fftData, int(decoder.SampleRate), ChunkSize, freqStart, freqEnd, gain)
+			ApplyEQToFFT(fftData, int(decoder.SampleRate()), ChunkSize, freqStart, freqEnd, gain)
 			ifftResult := PerformIFFT(fftData)
 
 			for j := 0; j < len(ifftResult); j++ {
@@ -101,34 +138,35 @@ func ApplyEqualization(inputFilePath, outputFilePath string, freqStart, freqEnd,
 		}
 	}
 
-	outputIntBufferData := make([]int, numSamples*int(decoder.NumChans))
+	outputIntBufferData := make([]int, numSamples*int(decoder.NumChans()))
 	for i := 0; i < numSamples; i++ {
-		for ch := 0; ch < int(decoder.NumChans); ch++ {
+		for ch := 0; ch < int(decoder.NumChans()); ch++ {
 			sample := outputBuffer[ch][i] * math.MaxInt16
 			if sample > math.MaxInt16 {
 				sample = math.MaxInt16
 			} else if sample < math.MinInt16 {
 				sample = math.MinInt16
 			}
-			outputIntBufferData[i*int(decoder.NumChans)+ch] = int(sample)
+			outputIntBufferData[i*int(decoder.NumChans())+ch] = int(sample)
 		}
 	}
 
 	log.Println("Saving result...")
-	return SaveWav(outputFilePath, outputIntBufferData, decoder)
+	// SaveWav still needs the original *wav.Decoder for NewEncoder
+	return SaveWav(outputFilePath, outputIntBufferData, originalDecoder)
 }
 
 // SaveWav saves PCM data to a new WAV file.
-func SaveWav(filePath string, pcmData []int, decoder *wav.Decoder) error {
+func SaveWav(filePath string, pcmData []int, originalDecoder *wav.Decoder) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	sampleRate := int(decoder.SampleRate)
-	bitDepth := int(decoder.BitDepth)
-	numChans := int(decoder.NumChans)
+	sampleRate := int(originalDecoder.SampleRate)
+	bitDepth := int(originalDecoder.BitDepth)
+	numChans := int(originalDecoder.NumChans)
 
 	encoder := wav.NewEncoder(file, sampleRate, bitDepth, numChans, 1)
 	intBuffer := &audio.IntBuffer{

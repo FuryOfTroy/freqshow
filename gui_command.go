@@ -45,9 +45,14 @@ func runGUI() {
 	w.SetTitle("Freqshow EQ GUI (Webview)")
 	w.SetSize(800, 600, webview.HintNone)
 
-	app := &App{}
+	app := &App{w: w}
+	defer app.Shutdown()
+
 	if err := w.Bind("RunEQCommand", app.RunEQCommand); err != nil {
 		log.Fatalf("Failed to bind RunEQCommand: %v", err)
+	}
+	if err := w.Bind("RunPlayCommand", app.RunPlayCommand); err != nil {
+		log.Fatalf("Failed to bind RunPlayCommand: %v", err)
 	}
 
 	assets, err := fs.Sub(content, "webview_assets")
